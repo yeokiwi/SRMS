@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Query Tool - Recent Changes Analyzer</title>
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d27;
+            --bg-card: #222536;
+            --border: #2e3348;
+            --text-primary: #e4e6f0;
+            --text-secondary: #9499b3;
+            --accent: #6c72cb;
+            --accent-hover: #8186d6;
+            --success: #4caf7c;
+            --warning: #e0a639;
+            --error: #d45656;
+            --tag-confirmed: #2d5a3d;
+            --tag-likely: #5a4f2d;
+            --tag-none: #4a3040;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        header h1 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .query-form {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group.small {
+            flex: 0 0 140px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
+        }
+
+        input[type="text"],
+        input[type="url"],
+        select {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1.5rem;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn .spinner {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .btn.loading .spinner {
+            display: inline-block;
+        }
+
+        .btn.loading .btn-text {
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-bar {
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .status-bar.visible {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-bar .pulse {
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .error-box {
+            display: none;
+            background: rgba(212, 86, 86, 0.1);
+            border: 1px solid var(--error);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            color: var(--error);
+            font-size: 0.9rem;
+        }
+
+        .error-box.visible {
+            display: block;
+        }
+
+        .results-container {
+            display: none;
+        }
+
+        .results-container.visible {
+            display: block;
+        }
+
+        .results-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .meta-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1.25rem;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .meta-card .meta-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .meta-card .meta-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 0.2rem;
+        }
+
+        .page-result {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
+            overflow: hidden;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+
+        .page-header:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .page-header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .page-number {
+            background: var(--accent);
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .page-url {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .page-url a {
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .page-url a:hover {
+            color: var(--accent);
+        }
+
+        .depth-badge {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.15rem 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .expand-icon {
+            color: var(--text-secondary);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+            font-size: 1.2rem;
+        }
+
+        .page-result.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .page-body {
+            display: none;
+            padding: 0 1.25rem 1.25rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .page-result.expanded .page-body {
+            display: block;
+        }
+
+        .analysis-content {
+            font-size: 0.9rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+        }
+
+        .analysis-content h2 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent);
+        }
+
+        .analysis-content h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .analysis-content p {
+            margin-bottom: 0.6rem;
+        }
+
+        .analysis-content ul, .analysis-content ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .analysis-content li {
+            margin-bottom: 0.3rem;
+        }
+
+        .analysis-content strong {
+            color: #fff;
+        }
+
+        .analysis-content code {
+            background: var(--bg-secondary);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        .no-content {
+            color: var(--text-secondary);
+            font-style: italic;
+            padding: 1rem 0;
+        }
+
+        .verdict-tag {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .verdict-confirmed {
+            background: var(--tag-confirmed);
+            color: var(--success);
+        }
+
+        .verdict-likely {
+            background: var(--tag-likely);
+            color: var(--warning);
+        }
+
+        .verdict-none {
+            background: var(--tag-none);
+            color: var(--error);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 640px) {
+            .form-row {
+                flex-direction: column;
+            }
+            .form-group.small {
+                flex: 1;
+            }
+            .results-meta {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Website Query Tool</h1>
+            <p>Analyze any website for recent changes, announcements, and updates from the last 30 days</p>
+        </header>
+
+        <div class="query-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="url-input">Website URL</label>
+                    <input type="url" id="url-input" placeholder="https://example.com" />
+                </div>
+                <div class="form-group small">
+                    <label for="depth-select">Crawl Depth</label>
+                    <select id="depth-select">
+                        <option value="0">0 - Single page</option>
+                        <option value="1" selected>1 - + Linked pages</option>
+                        <option value="2">2 - Deep crawl</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" id="query-btn" onclick="submitQuery()">
+                <span class="spinner"></span>
+                <span class="btn-text">Analyze Website</span>
+            </button>
+        </div>
+
+        <div class="status-bar" id="status-bar">
+            <div class="pulse"></div>
+            <span id="status-text">Crawling website...</span>
+        </div>
+
+        <div class="error-box" id="error-box"></div>
+
+        <div class="results-container" id="results-container">
+            <div class="results-meta" id="results-meta"></div>
+            <div id="pages-list"></div>
+        </div>
+
+        <footer>
+            Website Query Tool &mdash; Powered by crawl4ai &amp; DeepSeek LLM
+        </footer>
+    </div>
+
+    <script>
+        function submitQuery() {
+            const url = document.getElementById('url-input').value.trim();
+            const maxDepth = document.getElementById('depth-select').value;
+            const btn = document.getElementById('query-btn');
+            const statusBar = document.getElementById('status-bar');
+            const errorBox = document.getElementById('error-box');
+            const resultsContainer = document.getElementById('results-container');
+
+            if (!url) {
+                showError('Please enter a website URL.');
+                return;
+            }
+
+            // Reset UI
+            btn.classList.add('loading');
+            btn.disabled = true;
+            statusBar.classList.add('visible');
+            errorBox.classList.remove('visible');
+            resultsContainer.classList.remove('visible');
+
+            updateStatus('Initiating crawl of ' + url + '...');
+
+            const steps = [
+                'Launching headless browser...',
+                'Crawling pages (this may take a while for deep crawls)...',
+                'Applying LLM analysis to extracted content...',
+                'Generating structured report...'
+            ];
+            let stepIndex = 0;
+            const statusInterval = setInterval(() => {
+                stepIndex++;
+                if (stepIndex < steps.length) {
+                    updateStatus(steps[stepIndex]);
+                }
+            }, 8000);
+
+            fetch('/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url, max_depth: parseInt(maxDepth) })
+            })
+            .then(res => res.json())
+            .then(data => {
+                clearInterval(statusInterval);
+                btn.classList.remove('loading');
+                btn.disabled = false;
+                statusBar.classList.remove('visible');
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                renderResults(data);
+            })
+            .catch(err => {
+                clearInterval(statusInterval);
+                btn.classList.remove('loading');
+                btn.disabled = false;
+                statusBar.classList.remove('visible');
+                showError('Request failed: ' + err.message);
+            });
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status-text').textContent = text;
+        }
+
+        function showError(message) {
+            const errorBox = document.getElementById('error-box');
+            errorBox.textContent = message;
+            errorBox.classList.add('visible');
+        }
+
+        function renderResults(data) {
+            const container = document.getElementById('results-container');
+            const metaDiv = document.getElementById('results-meta');
+            const pagesList = document.getElementById('pages-list');
+
+            // Render meta cards
+            metaDiv.innerHTML = `
+                <div class="meta-card">
+                    <div class="meta-label">Pages Crawled</div>
+                    <div class="meta-value">${data.total_pages_crawled}</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Query Date</div>
+                    <div class="meta-value">${data.query_date}</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Lookback Since</div>
+                    <div class="meta-value">${data.lookback_date}</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Max Depth</div>
+                    <div class="meta-value">${data.max_depth}</div>
+                </div>
+            `;
+
+            // Render page results
+            pagesList.innerHTML = '';
+            data.pages.forEach((page, idx) => {
+                const div = document.createElement('div');
+                div.className = 'page-result' + (idx === 0 ? ' expanded' : '');
+
+                const analysisHtml = page.has_content
+                    ? formatAnalysis(page.analysis)
+                    : '<div class="no-content">No analysis content returned for this page.</div>';
+
+                div.innerHTML = `
+                    <div class="page-header" onclick="togglePage(this)">
+                        <div class="page-header-left">
+                            <div class="page-number">${page.index}</div>
+                            <div class="page-url"><a href="${escapeHtml(page.url)}" target="_blank" rel="noopener">${escapeHtml(page.url)}</a></div>
+                        </div>
+                        <span class="depth-badge">depth ${page.depth}</span>
+                        <span class="expand-icon">&#9660;</span>
+                    </div>
+                    <div class="page-body">
+                        <div class="analysis-content">${analysisHtml}</div>
+                    </div>
+                `;
+                pagesList.appendChild(div);
+            });
+
+            container.classList.add('visible');
+        }
+
+        function togglePage(headerEl) {
+            headerEl.closest('.page-result').classList.toggle('expanded');
+        }
+
+        function formatAnalysis(text) {
+            if (!text) return '';
+            // Convert markdown-like text to HTML
+            let html = escapeHtml(text);
+
+            // Headers
+            html = html.replace(/^## (\d+\..+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+
+            // Bold
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+            // Recency verdict styling
+            html = html.replace(
+                /<strong>Recency Verdict<\/strong>:\s*(.+)/gi,
+                function(match, verdict) {
+                    let cls = 'verdict-none';
+                    const lower = verdict.toLowerCase();
+                    if (lower.includes('confirmed recent') || lower.includes('confirmed updates')) {
+                        cls = 'verdict-confirmed';
+                    } else if (lower.includes('likely recent') || lower.includes('likely updates') || lower.includes('possible')) {
+                        cls = 'verdict-likely';
+                    }
+                    return '<strong>Recency Verdict</strong>: <span class="verdict-tag ' + cls + '">' + verdict + '</span>';
+                }
+            );
+
+            // Bullet lists
+            html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+            // Clean up nested <ul> tags
+            html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+            // Line breaks for remaining lines
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = html.replace(/\n/g, '<br>');
+            html = '<p>' + html + '</p>';
+
+            // Clean up empty paragraphs
+            html = html.replace(/<p>\s*<\/p>/g, '');
+
+            return html;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('url-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submitQuery();
+        });
+    </script>
+</body>
+</html>
