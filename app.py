@@ -78,13 +78,13 @@ async def crawl_and_analyze(url, max_depth=1):
         verbose=False
     )
 
-    api_key = os.getenv('DEEPSEEK_API_KEY')
+    api_key = os.getenv('ANTHROPIC_API_KEY')
     if not api_key:
-        return {"error": "DEEPSEEK_API_KEY not found in environment variables. Create a .env file with your API key."}
+        return {"error": "ANTHROPIC_API_KEY not found in environment variables. Create a .env file with your API key."}
 
     llm_filter = LLMContentFilter(
         llm_config=LLMConfig(
-            provider="deepseek/deepseek-chat",
+            provider="anthropic/claude-sonnet-4-5-20250929",
             api_token=api_key
         ),
         instruction=build_analysis_instruction(),
